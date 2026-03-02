@@ -61,26 +61,23 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Error creando item', details: createData.errors });
     }
 
-    // 2. RESUMEN LLAMADA → create_timeline_item
+    // 2. RESUMEN LLAMADA → create_timeline_item (estructura exacta)
     if (data.resumen_llamada) {
-      const now = new Date();
-      const startTime = new Date(now.getTime() - 30 * 60 * 1000).toISOString(); // -30min
-      const endTime = now.toISOString();
+      const now = new Date().toISOString();
+      const customActivityId = "llamada-elevenlabs-" + Date.now();
 
       await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: `
-            mutation ($itemId: ID!, $custom_activity_id: String!, $title: String!, $summary: String!, $content: String!, $timestamp: String!, $time_range: TimeRangeInput!) {
+            mutation ($itemId: ID!, $custom_activity_id: String!, $title: String!, $content: String!, $timestamp: String!) {
               create_timeline_item(
                 item_id: $itemId,
                 custom_activity_id: $custom_activity_id,
                 title: $title,
-                summary: $summary,
                 content: $content,
-                timestamp: $timestamp,
-                time_range: $time_range
+                timestamp: $timestamp
               ) {
                 id
               }
@@ -88,15 +85,10 @@ export default async function handler(req, res) {
           `,
           variables: {
             itemId: itemId,
-            custom_activity_id: "llamada-elevenlabs-" + Date.now(), // UUID único
-            title: "📞 Llamada con cliente",
-            summary: data.estado_lead || "Interesado-seguimiento",
-            content: `**RESUMEN LLAMADA** (${now.toLocaleString('es-ES')}):\n\n${data.resumen_llamada}`,
-            timestamp: endTime,
-            time_range: {
-              start_timestamp: startTime,
-              end_timestamp: endTime
-            }
+            custom_activity_id: customActivityId,
+            title: "Resumen llamada IA",
+            content: data.resumen_llamada,
+            timestamp: now
           }
         })
       });
@@ -107,10 +99,8 @@ export default async function handler(req, res) {
       itemId,
       nombre: data.nombre,
       estado: data.estado_lead,
-      timeline: data.resumen_llamada ? '✅ Timeline item creado' : '❌ Sin resumen'
+      timeline: data.resumen_llamada ? '✅ Resumen IA creado' : '❌ Sin resumen'
     });
 
   } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-}
+    return res.status(500).json({ e
