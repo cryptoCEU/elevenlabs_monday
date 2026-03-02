@@ -11,22 +11,33 @@ export default async function handler(req, res) {
     const data = req.body;
 
     const columnValues = JSON.stringify({
+      // 📧 EMAIL
       "lead_email": {
         "email": data.email || "",
         "text": data.email || ""
       },
+      
+      // 📱 PHONE
       "lead_phone": {
         "phone": data.telefono || "",
         "text": data.telefono || ""
       },
+      
+      // 📝 TEXTOS
       "text_mm12yqx0": data.codigo_postal || "",
+      
+      // ✅ ESTADO LEAD
       "lead_status": { 
         "label": data.estado_lead || "Interesado-seguimiento" 
       },
+      
+      // ✅ DROPDOWNS (todos los enums)
       "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",
       "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",
       "dropdown_mm12gwz0": data.anejos || "Sin definir",
       "dropdown_mksdhhgc": data.motivo_no_interes || "No sabe/no contesta",
+      
+      // ✅ STATUS COLORS (todos los enums)
       "color_mm0ee37e": { 
         "label": data.destino_vivienda || "Primera vivienda" 
       },
@@ -39,12 +50,16 @@ export default async function handler(req, res) {
       "color_mks9ct6h": { 
         "label": data.origen_contacto || "Google Ads" 
       },
+      
+      // ✅ CHECKBOX Y FECHA
       "boolean_mkvw55qp": { "checked": true },
       "date_mksbjga2": new Date().toISOString().split('T')[0],
-      "name": data.nombre || "Nuevo Lead"  // ✅ SOLO NOMBRE (sin estado)
+      
+      // ✅ NOMBRE (solo nombre)
+      "name": data.nombre || "Nuevo Lead"
     });
 
-    // 🚀 CREAR ITEM (nombre limpio)
+    // 🚀 1. CREAR ITEM
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 
@@ -67,7 +82,7 @@ export default async function handler(req, res) {
         variables: { 
           boardId: BOARD_ID, 
           groupId: "topics",
-          itemName: data.nombre || "Nuevo Lead",  // ✅ SOLO NOMBRE
+          itemName: data.nombre || "Nuevo Lead",
           columnValues 
         }
       })
@@ -83,7 +98,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 📝 RESUMEN LLAMADA
+    // 📝 2. RESUMEN LLAMADA → "Emails y actividades"
     if (data.resumen_llamada) {
       await fetch(MONDAY_API_URL, {
         method: 'POST',
@@ -93,13 +108,18 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           query: `
-            mutation ($itemId: ID!, $text: String!) {
-              create_update(item_id: $itemId, text: $text) { id }
+            mutation ($itemId: ID!, $body: String!) {
+              create_update(
+                item_id: $itemId, 
+                body: $body
+              ) {
+                id
+              }
             }
           `,
           variables: { 
             itemId,
-            text: `📞 **RESUMEN LLAMADA** (${new Date().toLocaleString('es-ES')}):\n\n${data.resumen_llamada}`
+            body: `📞 **RESUMEN LLAMADA** (${new Date().toLocaleString('es-ES')}):\n\n${data.resumen_llamada}`
           }
         })
       });
@@ -110,7 +130,8 @@ export default async function handler(req, res) {
       itemId,
       nombre: data.nombre,
       estado: data.estado_lead,
-      resumen_agregado: !!data.resumen_llamada
+      campos: 15,
+      resumen: data.resumen_llamada ? '✅ Actividades' : '❌ Vacío'
     });
 
   } catch (error) {
