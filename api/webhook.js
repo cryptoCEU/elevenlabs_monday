@@ -15,7 +15,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Email obligatorio' });
     }
 
-    // 🔍 Buscar existente (tipos corregidos)
+    // 🔍 Buscar existente
     const searchRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
           query ($boardId: ID!, $columnId: String!, $value: String!) {
             items_page_by_column_values (
               board_id: $boardId,
-              column_id: $columnId,
+              column_id: "lead_email",
               column_value: $value,
               limit: 1
             ) {
@@ -43,9 +43,15 @@ export default async function handler(req, res) {
     const searchData = await searchRes.json();
     const items = searchData.data?.items_page_by_column_values?.items || [];
 
+    // ✅ FORMATO ESPECIAL para EMAIL y PHONE
     const columnValues = JSON.stringify({
-      "lead_phone": data.telefono || "",
-      "lead_email": data.email || "",
+      // EMAIL column → {"email": "..."}
+      "lead_email": { "email": data.email },
+      
+      // PHONE column → {"phone": "..."}
+      "lead_phone": { "phone": data.telefono },
+      
+      // Resto de columnas normales
       "text_mm12yqx0": data.codigo_postal || "",
       "dropdown_mksd92xa": data.tipologia_interes || "",
       "dropdown_mksdgtr8": data.detalle_vivienda || "",
@@ -59,7 +65,7 @@ export default async function handler(req, res) {
     });
 
     if (items.length > 0) {
-      // ♻️ Actualizar
+      // Actualizar
       const itemId = items[0].id;
       await fetch(MONDAY_API_URL, {
         method: 'POST',
@@ -77,7 +83,7 @@ export default async function handler(req, res) {
       });
       return res.json({ status: "updated", itemId });
     } else {
-      // ➕ Crear nuevo (TIPOS CORREGIDOS)
+      // Crear nuevo
       const createRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
@@ -95,8 +101,8 @@ export default async function handler(req, res) {
             }
           `,
           variables: { 
-            boardId: BOARD_ID,           // ← ID! (string)
-            groupId: "topics",           // ← String!
+            boardId: BOARD_ID, 
+            groupId: "topics",
             itemName: data.nombre || 'Nuevo Lead',
             columnValues 
           }
@@ -104,20 +110,15 @@ export default async function handler(req, res) {
       });
 
       const createData = await createRes.json();
-      const itemId = createData.data?.create_item?.id;
-      
       return res.json({ 
         status: "created", 
-        itemId,
+        itemId: createData.data?.create_item?.id,
         group: "topics (Listado nuevos)",
-        debug: createData
+        columnsSent: columnValues.substring(0, 100) + "..."
       });
     }
 
   } catch (error) {
-    return res.status(500).json({ 
-      error: error.message,
-      details: error 
-    });
+    return res.status(500).json({ error: error.message });
   }
 }
