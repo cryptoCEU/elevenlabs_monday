@@ -61,35 +61,41 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Error creando item', details: createData.errors });
     }
 
-    // 2. TIMELINE ITEM EA - Resumen llamada en "Emails y actividades"
+    // 2. RESUMEN LLAMADA → create_timeline_item
     if (data.resumen_llamada) {
       const now = new Date();
-      const startTime = new Date(now.getTime() - 30 * 60 * 1000).toISOString(); // Hace 30min
-      const endTime = now.toISOString(); // Ahora
+      const startTime = new Date(now.getTime() - 30 * 60 * 1000).toISOString(); // -30min
+      const endTime = now.toISOString();
 
-      const timelineRes = await fetch(MONDAY_API_URL, {
+      await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: `
-            mutation ($boardId: ID!, $itemId: ID!, $timeline_item_ea: TimelineItemEaCreateInput!) {
-              create_timeline_item_ea(
-                board_id: $boardId,
+            mutation ($itemId: ID!, $custom_activity_id: String!, $title: String!, $summary: String!, $content: String!, $timestamp: String!, $time_range: TimeRangeInput!) {
+              create_timeline_item(
                 item_id: $itemId,
-                timeline_item_ea: $timeline_item_ea
+                custom_activity_id: $custom_activity_id,
+                title: $title,
+                summary: $summary,
+                content: $content,
+                timestamp: $timestamp,
+                time_range: $time_range
               ) {
                 id
               }
             }
           `,
           variables: {
-            boardId: BOARD_ID,
             itemId: itemId,
-            timeline_item_ea: {
-              start_datetime: startTime,
-              end_datetime: endTime,
-              content: `📞 **RESUMEN LLAMADA** (${now.toLocaleString('es-ES')}):\n\n${data.resumen_llamada}`,
-              type_id: 1099173150  // CAMBIA por tu type_id real de "Llamada"
+            custom_activity_id: "llamada-elevenlabs-" + Date.now(), // UUID único
+            title: "📞 Llamada con cliente",
+            summary: data.estado_lead || "Interesado-seguimiento",
+            content: `**RESUMEN LLAMADA** (${now.toLocaleString('es-ES')}):\n\n${data.resumen_llamada}`,
+            timestamp: endTime,
+            time_range: {
+              start_timestamp: startTime,
+              end_timestamp: endTime
             }
           }
         })
@@ -101,7 +107,7 @@ export default async function handler(req, res) {
       itemId,
       nombre: data.nombre,
       estado: data.estado_lead,
-      timeline: data.resumen_llamada ? '✅ Timeline EA' : '❌ Sin resumen'
+      timeline: data.resumen_llamada ? '✅ Timeline item creado' : '❌ Sin resumen'
     });
 
   } catch (error) {
