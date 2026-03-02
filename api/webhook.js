@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     const data = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    // Construcción de los valores de columna
+    // 🧩 Definición de columnas del item
     const columnValues = JSON.stringify({
       "lead_email": { "email": data.email || "", "text": data.email || "" },
       "lead_phone": { "phone": data.telefono || "", "text": data.telefono || "" },
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       "boolean_mkvw55qp": { "checked": true },
       "date_mksbjga2": new Date().toISOString().split('T')[0],
 
-      // ✅ Nueva columna: fecha y hora de visita
+      // ✅ Fecha y hora de visita (nueva columna)
       "date_mks930kf": data.datetime_visita_agendada
         ? { 
             "date": data.datetime_visita_agendada.split('T')[0], 
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       "name": data.nombre || "Nuevo Lead"
     });
 
-    // 1️⃣ Crear el ítem en Monday
+    // 1️⃣ Crear el item en Monday
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 
@@ -71,21 +71,29 @@ export default async function handler(req, res) {
     const itemId = createData?.data?.create_item?.id;
 
     if (!itemId) {
-      console.error("Error creando Item en Monday:", createData);
+      console.error("❌ Error creando item en Monday:", createData);
       return res.status(500).json({ error: 'Error creando item', details: createData.errors });
     }
 
     // 2️⃣ Crear timeline (actividad personalizada)
     if (data.resumen_llamada) {
-      const now = new Date().toISOString();
+      const now = new Date().toISOString(); // Timestamp actual UTC
 
-      // Si hay una fecha de visita, la añadimos al título
+      // ✅ Título en horario local de España (solo si hay visita)
       const titleBase = "Resumen llamada IA";
       const title = data.datetime_visita_agendada
-        ? `${titleBase} — visita ${new Date(data.datetime_visita_agendada).toLocaleString('es-ES', { 
-            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
-          })}`
+        ? (() => {
+            const fechaVisita = new Date(data.datetime_visita_agendada);
+            const formateada = fechaVisita.toLocaleString('es-ES', { 
+              day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+              timeZone: 'Europe/Madrid'
+            });
+            return `${titleBase} — visita ${formateada}`;
+          })()
         : titleBase;
+
+      console.log("🕓 Creando timeline con timestamp:", now);
+      console.log("🗒️ Contenido resumen:", data.resumen_llamada);
 
       const timelineRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
@@ -118,10 +126,10 @@ export default async function handler(req, res) {
       });
 
       const timelineData = await timelineRes.json();
-      if (timelineData.errors) console.error('Error creando timeline:', timelineData.errors);
+      if (timelineData.errors) console.error('⚠️ Error creando timeline:', timelineData.errors);
     }
 
-    // 3️⃣ Respuesta final al webhook
+    // 3️⃣ Respuesta final del webhook
     return res.json({ 
       success: true,
       itemId,
@@ -132,7 +140,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Error general del webhook:', error);
+    console.error('💥 Error general del webhook:', error);
     return res.status(500).json({ error: error.message });
   }
 }
