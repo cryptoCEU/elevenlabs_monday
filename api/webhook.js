@@ -9,10 +9,8 @@ export default async function handler(req, res) {
 
   try {
     const data = req.body;
-    console.log('📥 Recibido:', Object.keys(data));
 
     const columnValues = JSON.stringify({
-      // ✅ BÁSICOS (obligatorios)
       "lead_email": {
         "email": data.email || "",
         "text": data.email || ""
@@ -21,36 +19,32 @@ export default async function handler(req, res) {
         "phone": data.telefono || "",
         "text": data.telefono || ""
       },
-      
-      // ✅ TEXTOS
       "text_mm12yqx0": data.codigo_postal || "",
-      
-      // ✅ ESTADO LEAD (enum exacto)
       "lead_status": { 
         "label": data.estado_lead || "Interesado-seguimiento" 
       },
-      
-      // ✅ DROPDOWNS (todos los enums)
-      "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",     // Tipología
-      "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",     // Detalle vivienda
-      "dropdown_mm12gwz0": data.anejos || "Sin definir",               // Anejos
+      "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",
+      "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",
+      "dropdown_mm12gwz0": data.anejos || "Sin definir",
       "dropdown_mksdhhgc": data.motivo_no_interes || "No sabe/no contesta",
-      
-      // ✅ STATUS COLORS (todos los enums)
-      "color_mm0ee37e": { "label": data.destino_vivienda || "Primera vivienda" },
-      "color_mksg46wh": { "label": data.rango_edad || "31 - 45" },
-      "color_mm1274dx": { "label": data.presupuesto || "150K - 200K" },
-      "color_mks9ct6h": { "label": data.origen_contacto || "Formulario web" },
-      
-      // ✅ CHECKBOX Y DATE
+      "color_mm0ee37e": { 
+        "label": data.destino_vivienda || "Primera vivienda" 
+      },
+      "color_mksg46wh": { 
+        "label": data.rango_edad || "31 - 45" 
+      },
+      "color_mm1274dx": { 
+        "label": data.presupuesto || "300K - 350K" 
+      },
+      "color_mks9ct6h": { 
+        "label": data.origen_contacto || "Google Ads" 
+      },
       "boolean_mkvw55qp": { "checked": true },
       "date_mksbjga2": new Date().toISOString().split('T')[0],
-      
-      // ✅ NOMBRE
-      "name": data.nombre || "Nuevo Lead"
+      "name": data.nombre || "Nuevo Lead"  // ✅ SOLO NOMBRE (sin estado)
     });
 
-    // 🚀 1. CREAR ITEM
+    // 🚀 CREAR ITEM (nombre limpio)
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 
@@ -73,7 +67,7 @@ export default async function handler(req, res) {
         variables: { 
           boardId: BOARD_ID, 
           groupId: "topics",
-          itemName: `${data.nombre || 'Lead'} - ${data.estado_lead || 'Nuevo'}`,
+          itemName: data.nombre || "Nuevo Lead",  // ✅ SOLO NOMBRE
           columnValues 
         }
       })
@@ -89,7 +83,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 📝 2. AGREGAR RESUMEN LLAMADA como actualización
+    // 📝 RESUMEN LLAMADA
     if (data.resumen_llamada) {
       await fetch(MONDAY_API_URL, {
         method: 'POST',
@@ -100,12 +94,7 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           query: `
             mutation ($itemId: ID!, $text: String!) {
-              create_update(
-                item_id: $itemId, 
-                text: $text
-              ) {
-                id
-              }
+              create_update(item_id: $itemId, text: $text) { id }
             }
           `,
           variables: { 
@@ -121,7 +110,6 @@ export default async function handler(req, res) {
       itemId,
       nombre: data.nombre,
       estado: data.estado_lead,
-      campos_mapeados: 15,
       resumen_agregado: !!data.resumen_llamada
     });
 
