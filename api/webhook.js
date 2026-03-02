@@ -21,7 +21,7 @@ export default async function handler(req, res) {
         query: `
           query ($boardId: ID!) {
             boards(ids: [$boardId]) {
-              items_page(limit: 5000) {
+              items_page(limit: 500) {
                 items {
                   id
                   name
