@@ -70,12 +70,14 @@ export default async function handler(req, res) {
     // 🧾 Log completo para diagnóstico
     console.log("🧩 Respuesta Monday create_item:", JSON.stringify(createData, null, 2));
 
-    // Extraer ID del item
-    const itemId = createData?.data?.create_item?.id;
-    if (!itemId) {
+    // Extraer ID del item y castear a Int
+    const rawItemId = createData?.data?.create_item?.id;
+    if (!rawItemId) {
       console.error("❌ No se obtuvo itemId del create_item", createData.errors);
       return res.status(500).json({ error: 'Item no creado', details: createData.errors });
     }
+
+    const itemId = parseInt(rawItemId, 10);
     console.log("✅ Item creado con ID:", itemId);
 
     // 2️⃣ Crear timeline si hay resumen
@@ -105,7 +107,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           query: `
-            mutation ($itemId: ID!, $custom_activity_id: String!, $title: String!, $content: String!, $timestamp: String!) {
+            mutation ($itemId: Int!, $custom_activity_id: String!, $title: String!, $content: String!, $timestamp: String!) {
               create_timeline_item(
                 item_id: $itemId,
                 custom_activity_id: $custom_activity_id,
