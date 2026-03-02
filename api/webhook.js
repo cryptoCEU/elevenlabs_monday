@@ -7,8 +7,10 @@ export default async function handler(req, res) {
 
   try {
     const data = req.body;
+    console.log('📥 Datos recibidos:', JSON.stringify(data, null, 2));
     
-    // 🔍 1. BUSCAR TODOS los ítems (LIMIT 5000)
+    // 🔍 1. BUSCAR (con try-catch específico)
+    console.log('🔍 Buscando ítems existentes...');
     const searchRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 
@@ -19,7 +21,7 @@ export default async function handler(req, res) {
         query: `
           query ($boardId: ID!) {
             boards(ids: [$boardId]) {
-              items_page(limit: 5000) {  // ✅ CAMBIADO A 5000
+              items_page(limit: 5000) {
                 items {
                   id
                   name
@@ -36,51 +38,61 @@ export default async function handler(req, res) {
       })
     });
 
-    const searchData = await searchRes.json();
+    const searchText = await searchRes.text();
+    console.log('🔍 Search RAW response:', searchText.substring(0, 500));
+    
+    const searchData = JSON.parse(searchText);
+    
+    if (!searchData.data?.boards?.[0]?.items_page) {
+      return res.status(500).json({ 
+        error: 'Monday Search Error', 
+        response: searchData,
+        boardId: BOARD_ID 
+      });
+    }
+
     const items = searchData.data.boards[0].items_page.items;
+    console.log(`🔍 Encontrados ${items.length} ítems`);
     
-    console.log(`🔍 Buscando en ${items.length} ítems...`);
-    
-    // 🎯 MATCH EXACTO por email O teléfono
+    // 🎯 BUSCAR MATCH
     let existingItem = null;
-    for (const item of items) {
+    for (const item of items.slice(0, 10)) { // Solo debug primeros 10
       const emailCol = item.column_values.find(col => col.id === 'lead_email');
       const phoneCol = item.column_values.find(col => col.id === 'lead_phone');
       
-      const itemEmail = emailCol?.value ? JSON.parse(emailCol.value).email : '';
-      const itemPhone = phoneCol?.value ? JSON.parse(phoneCol.value).phone : '';
+      let itemEmail = '';
+      let itemPhone = '';
       
-      console.log(`📧 Item ${item.id}: email="${itemEmail}", phone="${itemPhone}"`);
-      console.log(`🎯 Buscando: email="${data.email}", phone="${data.telefono}"`);
+      try {
+        itemEmail = emailCol?.value ? JSON.parse(emailCol.value)?.email || '' : '';
+        itemPhone = phoneCol?.value ? JSON.parse(phoneCol.value)?.phone || '' : '';
+      } catch(e) {
+        console.log(`⚠️ Parse error item ${item.id}:`, e.message);
+      }
+      
+      console.log(`📧 Item ${item.id}: "${itemEmail}" | "${itemPhone}"`);
+      console.log(`🎯 Query:    "${data.email}" | "${data.telefono}"`);
       
       if (itemEmail === data.email || itemPhone === data.telefono) {
         existingItem = item;
-        console.log(`✅ ENCONTRADO! Item ${item.id}`);
+        console.log(`✅ ✅ MATCH! Item ${item.id}`);
         break;
       }
     }
 
+    // ... resto del código igual (columnValues, update/create)
     const columnValues = JSON.stringify({
       "lead_email": { "email": data.email, "text": data.email },
       "lead_phone": { "phone": data.telefono, "text": data.telefono },
       "text_mm12yqx0": data.codigo_postal || "",
       "lead_status": { "label": data.estado_lead || "Interesado-seguimiento" },
-      "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",
-      "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",
-      "dropdown_mm12gwz0": data.anejos || "Sin definir",
-      "dropdown_mksdhhgc": data.motivo_no_interes || "No sabe/no contesta",
-      "color_mm0ee37e": { "label": data.destino_vivienda || "Primera vivienda" },
-      "color_mksg46wh": { "label": data.rango_edad || "31 - 45" },
-      "color_mm1274dx": { "label": data.presupuesto || "300K - 350K" },
-      "color_mks9ct6h": { "label": data.origen_contacto || "Google Ads" },
       "boolean_mkvw55qp": { "checked": true },
       "date_mksbjga2": new Date().toISOString().split('T')[0],
       "name": data.nombre || "Nuevo Lead"
     });
 
     if (existingItem) {
-      // 🔄 UPDATE
-      console.log(`🔄 Actualizando item ${existingItem.id}`);
+      // UPDATE
       const updateRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
@@ -96,26 +108,26 @@ export default async function handler(req, res) {
         })
       });
       
-      const updateData = await updateRes.json();
       return res.json({ 
         success: true, 
         action: "UPDATED",
-        itemId: existingItem.id,
-        message: `✅ Lead actualizado: ${data.nombre}`
+        itemId: existingItem.id
       });
       
     } else {
-      // ➕ CREATE
-      console.log('➕ Creando nuevo lead');
+      // CREATE
       const createRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: `
             mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
-              create_item(board_id: $boardId, group_id: $groupId, item_name: $itemName, column_values: $columnValues) { 
-                id 
-              }
+              create_item(
+                board_id: $boardId, 
+                group_id: $groupId,
+                item_name: $itemName, 
+                column_values: $columnValues
+              ) { id }
             }
           `,
           variables: { 
@@ -131,13 +143,16 @@ export default async function handler(req, res) {
       return res.json({ 
         success: true, 
         action: "CREATED", 
-        itemId: createData.data.create_item.id,
-        message: `✅ Nuevo lead: ${data.nombre}`
+        itemId: createData.data.create_item.id
       });
     }
 
   } catch (error) {
-    console.error('ERROR:', error);
-    return res.status(500).json({ error: error.message });
+    console.error('❌ ERROR TOTAL:', error);
+    return res.status(500).json({ 
+      error: error.message, 
+      stack: error.stack,
+      body: req.body 
+    });
   }
 }
