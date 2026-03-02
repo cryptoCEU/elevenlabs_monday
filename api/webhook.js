@@ -10,31 +10,44 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // 🎯 TUS COLUMNAS EXACTAS del Playground
+    // ✅ Mapeo EXACTO: ElevenLabs → Monday.com columnas REALES
     const columnValues = JSON.stringify({
-      // EMAIL (tu ID real)
-      "email_mm0zf8xc": { "email": data.email },
+      // ✅ CAMPOS BÁSICOS (IDs reales)
+      "lead_email": { "email": data.email || "" },
+      "lead_phone": data.telefono || "",
+      "text_mm12yqx0": data.codigo_postal || "",
       
-      // PHONE (tu formato directo)
-      "phone_mm0z9evz": data.telefono,
+      // ✅ ESTADOS Y COLORS (status columns)
+      "lead_status": { "label": data.estado_lead || "Interesado-seguimiento" },
       
-      // Código postal
-      "text_mm0zz0cc": data.codigo_postal,
+      // ✅ DROPDOWNS (exact match con enums)
+      "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",
+      "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",
+      "dropdown_mm12gwz0": data.anejos || "Sin definir",
+      "dropdown_mksdhhgc": data.motivo_no_interes || "No sabe/no contesta",
       
-      // Status colores (usa labels exactos)
-      "color_mm0zwptv": data.estado_lead || "No cualificado",
+      // ✅ STATUS COLORS (usa labels de tus enums)
+      "color_mm0ee37e": { "label": data.destino_vivienda || "Primera vivienda" },
+      "color_mksg46wh": { "label": data.rango_edad || "31 - 45" },
+      "color_mm1274dx": { "label": data.presupuesto || "150K - 200K" },
+      "color_mks9ct6h": { "label": data.origen_contacto || "Formulario web" },
       
-      // Dropdowns (usa labels exactos)
-      "dropdown_mm0zfhhp": data.destino_vivienda || "Uso personal",
-      "dropdown_mm0zw343": data.tipologia_interes || "2 Dormitorios",
-      "dropdown_mm0zpwn1": data.presupuesto || "150K - 200K", 
-      "dropdown_mm0zp09r": data.rango_edad || "36 - 45",
-      "dropdown_mm0zp09r": data.origen_contacto || "Google"
+      // ✅ TEXTOS IMPORTANTES
+      "name": data.nombre || "Nuevo Lead",
+      
+      // ✅ AUTOMÁTICO: Fecha entrada
+      "date_mksbjga2": new Date().toISOString().split('T')[0],
+      
+      // ✅ Checkbox privacidad (por defecto true)
+      "boolean_mkvw55qp": true
     });
 
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
-      headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
+      headers: { 
+        'Authorization': MONDAY_API_KEY, 
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify({
         query: `
           mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
@@ -50,28 +63,35 @@ export default async function handler(req, res) {
         `,
         variables: { 
           boardId: BOARD_ID, 
-          groupId: "topics",
-          itemName: data.nombre || 'Nuevo Lead',
+          groupId: "topics", // Cambia si usas otro grupo
+          itemName: `${data.nombre || 'Lead'} - ${data.estado_lead || 'Nuevo'}`,
           columnValues 
         }
       })
     });
 
     const createData = await createRes.json();
-    const itemId = createData.data?.create_item?.id;
+    
+    if (!createData.data?.create_item?.id) {
+      return res.status(500).json({ 
+        error: 'Monday API Error', 
+        details: createData.errors || createData 
+      });
+    }
 
     return res.json({ 
-      status: "created", 
-      itemId,
-      group: "topics (Listado nuevos)",
-      columns_used: [
-        "email_mm0zf8xc", "phone_mm0z9evz", "text_mm0zz0cc",
-        "color_mm0zwptv", "dropdown_mm0zfhhp", "dropdown_mm0zw343"
-      ],
-      debug: createData
+      success: true,
+      itemId: createData.data.create_item.id,
+      lead: data.nombre,
+      estado: data.estado_lead,
+      mapped_fields: [
+        'lead_email', 'lead_phone', 'text_mm12yqx0',
+        'lead_status', 'dropdown_mksd92xa', 'dropdown_mm12gwz0'
+      ]
     });
 
   } catch (error) {
+    console.error('Webhook Error:', error);
     return res.status(500).json({ error: error.message });
   }
 }
