@@ -10,44 +10,46 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // ✅ FORMATO CORRECTO Monday.com API (email/phone/status)
+    // ✅ TODOS los formatos correctos Monday.com API
     const columnValues = JSON.stringify({
-      // 📧 EMAIL - Formato OBLIGATORIO
+      // 📧 EMAIL ✓
       "lead_email": {
         "email": data.email || "",
         "text": data.email || ""
       },
       
-      // 📱 PHONE - Formato OBLIGATORIO  
+      // 📱 PHONE ✓
       "lead_phone": {
         "phone": data.telefono || "",
         "text": data.telefono || ""
       },
       
-      // 📝 Text simple
+      // 📝 TEXT ✓
       "text_mm12yqx0": data.codigo_postal || "",
       
-      // ✅ Status (label exacto del enum)
-      "lead_status": {
-        "label": data.estado_lead || "Interesado-seguimiento"
-      },
+      // ✅ STATUS ✓
+      "lead_status": { "label": data.estado_lead || "Interesado-seguimiento" },
       
-      // ✅ Dropdowns (label exacto)
+      // ✅ DROPDOWNS ✓
       "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",
       "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",
       "dropdown_mm12gwz0": data.anejos || "Sin definir",
       "dropdown_mksdhhgc": data.motivo_no_interes || "No sabe/no contesta",
       
-      // ✅ Status colors (labels de tus enums)
+      // ✅ STATUS COLORS ✓
       "color_mm0ee37e": { "label": data.destino_vivienda || "Primera vivienda" },
       "color_mksg46wh": { "label": data.rango_edad || "31 - 45" },
-      "color_mm1274dx": { "label": data.presupuesto || "150K - 200K" },
-      "color_mks9ct6h": { "label": data.origen_contacto || "Formulario web" },
+      "color_mm1274dx": { "label": data.presupuesto || "300K - 350K" },
+      "color_mks9ct6h": { "label": data.origen_contacto || "Google Ads" },
       
-      // ✅ Automáticos
-      "name": data.nombre || "Nuevo Lead",
-      "date_mksbjga2": new Date().toISOString().split('T')[0], // YYYY-MM-DD
-      "boolean_mkvw55qp": true // Política privacidad
+      // ✅ CHECKBOX - FORMATO CORRECTO
+      "boolean_mkvw55qp": { "checked": true },
+      
+      // ✅ DATE - Solo YYYY-MM-DD
+      "date_mksbjga2": "2026-03-02",
+      
+      // ✅ NOMBRE
+      "name": data.nombre || "Nuevo Lead"
     });
 
     const createRes = await fetch(MONDAY_API_URL, {
@@ -63,8 +65,7 @@ export default async function handler(req, res) {
               board_id: $boardId, 
               group_id: $groupId,
               item_name: $itemName, 
-              column_values: $columnValues,
-              create_labels_if_missing: true
+              column_values: $columnValues
             ) { 
               id 
             }
@@ -84,8 +85,7 @@ export default async function handler(req, res) {
     if (!createData.data?.create_item?.id) {
       return res.status(500).json({ 
         error: 'Monday API Error', 
-        details: createData.errors,
-        debug: { columnValues } 
+        details: createData.errors 
       });
     }
 
