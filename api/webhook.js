@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // 1. CREAR ITEM
+    // 1. Crear item en Monday
     const columnValues = JSON.stringify({
       "lead_email": { "email": data.email || "", "text": data.email || "" },
       "lead_phone": { "phone": data.telefono || "", "text": data.telefono || "" },
@@ -31,7 +31,10 @@ export default async function handler(req, res) {
 
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
-      headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
+      headers: { 
+        'Authorization': MONDAY_API_KEY, 
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify({
         query: `
           mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
@@ -58,17 +61,23 @@ export default async function handler(req, res) {
     const itemId = createData.data?.create_item?.id;
 
     if (!itemId) {
-      return res.status(500).json({ error: 'Error creando item', details: createData.errors });
+      return res.status(500).json({ 
+        error: 'Error creando item', 
+        details: createData.errors 
+      });
     }
 
-    // 2. RESUMEN LLAMADA → create_timeline_item (estructura exacta)
+    // 2. Resumen llamada → create_timeline_item
     if (data.resumen_llamada) {
       const now = new Date().toISOString();
-      const customActivityId = "llamada-elevenlabs-" + Date.now();
+      const customActivityId = "llamada-" + Date.now();
 
       await fetch(MONDAY_API_URL, {
         method: 'POST',
-        headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
+        headers: { 
+          'Authorization': MONDAY_API_KEY, 
+          'Content-Type': 'application/json' 
+        },
         body: JSON.stringify({
           query: `
             mutation ($itemId: ID!, $custom_activity_id: String!, $title: String!, $content: String!, $timestamp: String!) {
@@ -96,11 +105,13 @@ export default async function handler(req, res) {
 
     return res.json({ 
       success: true,
-      itemId,
+      itemId: itemId,
       nombre: data.nombre,
       estado: data.estado_lead,
-      timeline: data.resumen_llamada ? '✅ Resumen IA creado' : '❌ Sin resumen'
+      timeline: data.resumen_llamada ? '✅ Creado' : '❌ Sin resumen'
     });
 
   } catch (error) {
-    return res.status(500).json({ e
+    return res.status(500).json({ error: error.message });
+  }
+}
