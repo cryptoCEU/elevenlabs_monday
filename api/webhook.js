@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
     
-    // 📧 1. BUSCAR por email O teléfono
+    // 🔍 1. BUSCAR TODOS los ítems (LIMIT 5000)
     const searchRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
         query: `
           query ($boardId: ID!) {
             boards(ids: [$boardId]) {
-              items_page(limit: 1) {
+              items_page(limit: 5000) {  // ✅ CAMBIADO A 5000
                 items {
                   id
                   name
@@ -39,7 +39,9 @@ export default async function handler(req, res) {
     const searchData = await searchRes.json();
     const items = searchData.data.boards[0].items_page.items;
     
-    // 🎯 MATCH por email O teléfono
+    console.log(`🔍 Buscando en ${items.length} ítems...`);
+    
+    // 🎯 MATCH EXACTO por email O teléfono
     let existingItem = null;
     for (const item of items) {
       const emailCol = item.column_values.find(col => col.id === 'lead_email');
@@ -48,8 +50,12 @@ export default async function handler(req, res) {
       const itemEmail = emailCol?.value ? JSON.parse(emailCol.value).email : '';
       const itemPhone = phoneCol?.value ? JSON.parse(phoneCol.value).phone : '';
       
+      console.log(`📧 Item ${item.id}: email="${itemEmail}", phone="${itemPhone}"`);
+      console.log(`🎯 Buscando: email="${data.email}", phone="${data.telefono}"`);
+      
       if (itemEmail === data.email || itemPhone === data.telefono) {
         existingItem = item;
+        console.log(`✅ ENCONTRADO! Item ${item.id}`);
         break;
       }
     }
@@ -68,14 +74,13 @@ export default async function handler(req, res) {
       "color_mm1274dx": { "label": data.presupuesto || "300K - 350K" },
       "color_mks9ct6h": { "label": data.origen_contacto || "Google Ads" },
       "boolean_mkvw55qp": { "checked": true },
-      "date_mksbjga2": "2026-03-02",
+      "date_mksbjga2": new Date().toISOString().split('T')[0],
       "name": data.nombre || "Nuevo Lead"
     });
 
-    let result;
-    
     if (existingItem) {
-      // 🔄 UPDATE existente
+      // 🔄 UPDATE
+      console.log(`🔄 Actualizando item ${existingItem.id}`);
       const updateRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
@@ -87,30 +92,30 @@ export default async function handler(req, res) {
               }
             }
           `,
-          variables: { 
-            itemId: existingItem.id, 
-            columnValues 
-          }
+          variables: { itemId: existingItem.id, columnValues }
         })
       });
       
-      result = await updateRes.json();
+      const updateData = await updateRes.json();
       return res.json({ 
         success: true, 
-        action: "UPDATED", 
+        action: "UPDATED",
         itemId: existingItem.id,
-        message: `Lead actualizado: ${data.nombre}`
+        message: `✅ Lead actualizado: ${data.nombre}`
       });
       
     } else {
-      // ➕ CREATE nuevo
+      // ➕ CREATE
+      console.log('➕ Creando nuevo lead');
       const createRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: `
             mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
-              create_item(board_id: $boardId, group_id: $groupId, item_name: $itemName, column_values: $columnValues) { id }
+              create_item(board_id: $boardId, group_id: $groupId, item_name: $itemName, column_values: $columnValues) { 
+                id 
+              }
             }
           `,
           variables: { 
@@ -122,16 +127,17 @@ export default async function handler(req, res) {
         })
       });
       
-      result = await createRes.json();
+      const createData = await createRes.json();
       return res.json({ 
         success: true, 
         action: "CREATED", 
-        itemId: result.data.create_item.id,
-        message: `Nuevo lead creado: ${data.nombre}`
+        itemId: createData.data.create_item.id,
+        message: `✅ Nuevo lead: ${data.nombre}`
       });
     }
 
   } catch (error) {
+    console.error('ERROR:', error);
     return res.status(500).json({ error: error.message });
   }
 }
