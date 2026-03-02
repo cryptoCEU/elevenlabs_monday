@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Solo POST permitido' });
+    return res.status(405).json({ error: 'Solo se permite POST' });
   }
 
   const MONDAY_API_URL = "https://api.monday.com/v2";
@@ -8,9 +8,8 @@ export default async function handler(req, res) {
   const BOARD_ID = process.env.MONDAY_BOARD_ID;
 
   try {
-    const data = req.body;
+    const data = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
-    // 1. CREAR ITEM en Monday
     const columnValues = JSON.stringify({
       "lead_email": { "email": data.email || "", "text": data.email || "" },
       "lead_phone": { "phone": data.telefono || "", "text": data.telefono || "" },
@@ -29,6 +28,7 @@ export default async function handler(req, res) {
       "name": data.nombre || "Nuevo Lead"
     });
 
+    // 1️⃣ Crear el item
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 
@@ -39,12 +39,12 @@ export default async function handler(req, res) {
         query: `
           mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
             create_item(
-              board_id: $boardId, 
+              board_id: $boardId,
               group_id: $groupId,
-              item_name: $itemName, 
+              item_name: $itemName,
               column_values: $columnValues
-            ) { 
-              id 
+            ) {
+              id
             }
           }
         `,
@@ -52,26 +52,23 @@ export default async function handler(req, res) {
           boardId: BOARD_ID, 
           groupId: "topics",
           itemName: data.nombre || "Nuevo Lead",
-          columnValues 
+          columnValues
         }
       })
     });
 
     const createData = await createRes.json();
-    const itemId = createData.data?.create_item?.id;
+    const itemId = createData?.data?.create_item?.id;
 
     if (!itemId) {
-      return res.status(500).json({ 
-        error: 'Error creando item', 
-        details: createData.errors 
-      });
+      return res.status(500).json({ error: 'Error creando item', details: createData.errors });
     }
 
-    // 2. RESUMEN LLAMADA → create_timeline_item (custom_activity_id FIJO)
+    // 2️⃣ Crear actividad (timeline)
     if (data.resumen_llamada) {
       const now = new Date().toISOString();
 
-      await fetch(MONDAY_API_URL, {
+      const timelineRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: { 
           'Authorization': MONDAY_API_KEY, 
@@ -92,25 +89,29 @@ export default async function handler(req, res) {
             }
           `,
           variables: {
-            itemId: itemId,
-            custom_activity_id: "587c0c1e-a5b2-44cd-a268-48210c319855",  // ✅ ID FIJO
+            itemId,
+            custom_activity_id: "587c0c1e-a5b2-44cd-a268-48210c319855",
             title: "Resumen llamada IA",
             content: data.resumen_llamada,
             timestamp: now
           }
         })
       });
+
+      const timelineData = await timelineRes.json();
+      if (timelineData.errors) console.error('Error en timeline:', timelineData.errors);
     }
 
     return res.json({ 
       success: true,
-      itemId: itemId,
+      itemId,
       nombre: data.nombre,
       estado: data.estado_lead,
       timeline: data.resumen_llamada ? '✅ Creado en actividades' : '❌ Sin resumen'
     });
 
   } catch (error) {
+    console.error('Error general:', error);
     return res.status(500).json({ error: error.message });
   }
 }
