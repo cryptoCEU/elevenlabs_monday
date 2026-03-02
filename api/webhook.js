@@ -9,114 +9,67 @@ export default async function handler(req, res) {
 
   try {
     const data = req.body;
-    const email = data.email;
 
-    if (!email) {
-      return res.status(400).json({ error: 'Email obligatorio' });
-    }
+    // 🎯 TUS COLUMNAS EXACTAS del Playground
+    const columnValues = JSON.stringify({
+      // EMAIL (tu ID real)
+      "email_mm0zf8xc": { "email": data.email },
+      
+      // PHONE (tu formato directo)
+      "phone_mm0z9evz": data.telefono,
+      
+      // Código postal
+      "text_mm0zz0cc": data.codigo_postal,
+      
+      // Status colores (usa labels exactos)
+      "color_mm0zwptv": data.estado_lead || "No cualificado",
+      
+      // Dropdowns (usa labels exactos)
+      "dropdown_mm0zfhhp": data.destino_vivienda || "Uso personal",
+      "dropdown_mm0zw343": data.tipologia_interes || "2 Dormitorios",
+      "dropdown_mm0zpwn1": data.presupuesto || "150K - 200K", 
+      "dropdown_mm0zp09r": data.rango_edad || "36 - 45",
+      "dropdown_mm0zp09r": data.origen_contacto || "Google"
+    });
 
-    // 🔍 Buscar existente
-    const searchRes = await fetch(MONDAY_API_URL, {
+    const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query: `
-          query ($boardId: ID!, $columnId: String!, $value: String!) {
-            items_page_by_column_values (
-              board_id: $boardId,
-              column_id: "lead_email",
-              column_value: $value,
-              limit: 1
-            ) {
-              items { id }
+          mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
+            create_item(
+              board_id: $boardId, 
+              group_id: $groupId,
+              item_name: $itemName, 
+              column_values: $columnValues
+            ) { 
+              id 
             }
           }
         `,
-        variables: {
-          boardId: BOARD_ID,
-          columnId: "lead_email",
-          value: email
+        variables: { 
+          boardId: BOARD_ID, 
+          groupId: "topics",
+          itemName: data.nombre || 'Nuevo Lead',
+          columnValues 
         }
       })
     });
 
-    const searchData = await searchRes.json();
-    const items = searchData.data?.items_page_by_column_values?.items || [];
+    const createData = await createRes.json();
+    const itemId = createData.data?.create_item?.id;
 
-    // ✅ FORMATO ESPECIAL para EMAIL y PHONE
-    const columnValues = JSON.stringify({
-      // EMAIL column → {"email": "..."}
-      "lead_email": { "email": data.email },
-      
-      // PHONE column → {"phone": "..."}
-      "lead_phone": { "phone": data.telefono },
-      
-      // Resto de columnas normales
-      "text_mm12yqx0": data.codigo_postal || "",
-      "dropdown_mksd92xa": data.tipologia_interes || "",
-      "dropdown_mksdgtr8": data.detalle_vivienda || "",
-      "dropdown_mm12gwz0": data.anejos || "",
-      "color_mks9ct6h": data.origen_contacto || "",
-      "lead_status": data.estado_lead || "",
-      "dropdown_mksdhhgc": data.motivo_no_interes || "",
-      "color_mm1274dx": data.presupuesto || "",
-      "color_mksg46wh": data.rango_edad || "",
-      "color_mm0ee37e": data.destino_vivienda || ""
+    return res.json({ 
+      status: "created", 
+      itemId,
+      group: "topics (Listado nuevos)",
+      columns_used: [
+        "email_mm0zf8xc", "phone_mm0z9evz", "text_mm0zz0cc",
+        "color_mm0zwptv", "dropdown_mm0zfhhp", "dropdown_mm0zw343"
+      ],
+      debug: createData
     });
-
-    if (items.length > 0) {
-      // Actualizar
-      const itemId = items[0].id;
-      await fetch(MONDAY_API_URL, {
-        method: 'POST',
-        headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: `
-            mutation ($itemId: ID!, $boardId: ID!, $columnValues: JSON!) {
-              change_multiple_column_values(item_id: $itemId, board_id: $boardId, column_values: $columnValues) {
-                id
-              }
-            }
-          `,
-          variables: { itemId, boardId: BOARD_ID, columnValues }
-        })
-      });
-      return res.json({ status: "updated", itemId });
-    } else {
-      // Crear nuevo
-      const createRes = await fetch(MONDAY_API_URL, {
-        method: 'POST',
-        headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: `
-            mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
-              create_item(
-                board_id: $boardId, 
-                group_id: $groupId,
-                item_name: $itemName, 
-                column_values: $columnValues
-              ) { 
-                id 
-              }
-            }
-          `,
-          variables: { 
-            boardId: BOARD_ID, 
-            groupId: "topics",
-            itemName: data.nombre || 'Nuevo Lead',
-            columnValues 
-          }
-        })
-      });
-
-      const createData = await createRes.json();
-      return res.json({ 
-        status: "created", 
-        itemId: createData.data?.create_item?.id,
-        group: "topics (Listado nuevos)",
-        columnsSent: columnValues.substring(0, 100) + "..."
-      });
-    }
 
   } catch (error) {
     return res.status(500).json({ error: error.message });
