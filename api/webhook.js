@@ -9,60 +9,48 @@ export default async function handler(req, res) {
 
   try {
     const data = req.body;
+    console.log('📥 Recibido:', Object.keys(data));
 
     const columnValues = JSON.stringify({
-      // 📧 EMAIL ✓
+      // ✅ BÁSICOS (obligatorios)
       "lead_email": {
         "email": data.email || "",
         "text": data.email || ""
       },
-      
-      // 📱 PHONE ✓
       "lead_phone": {
         "phone": data.telefono || "",
         "text": data.telefono || ""
       },
       
-      // 📝 TEXT ✓
+      // ✅ TEXTOS
       "text_mm12yqx0": data.codigo_postal || "",
       
-      // ✅ STATUS ✓
+      // ✅ ESTADO LEAD (enum exacto)
       "lead_status": { 
         "label": data.estado_lead || "Interesado-seguimiento" 
       },
       
-      // ✅ DROPDOWNS ✓
-      "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",
-      "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",
-      "dropdown_mm12gwz0": data.anejos || "Sin definir",
+      // ✅ DROPDOWNS (todos los enums)
+      "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",     // Tipología
+      "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",     // Detalle vivienda
+      "dropdown_mm12gwz0": data.anejos || "Sin definir",               // Anejos
       "dropdown_mksdhhgc": data.motivo_no_interes || "No sabe/no contesta",
       
-      // ✅ STATUS COLORS ✓
-      "color_mm0ee37e": { 
-        "label": data.destino_vivienda || "Primera vivienda" 
-      },
-      "color_mksg46wh": { 
-        "label": data.rango_edad || "31 - 45" 
-      },
-      "color_mm1274dx": { 
-        "label": data.presupuesto || "300K - 350K" 
-      },
-      "color_mks9ct6h": { 
-        "label": data.origen_contacto || "Google Ads" 
-      },
+      // ✅ STATUS COLORS (todos los enums)
+      "color_mm0ee37e": { "label": data.destino_vivienda || "Primera vivienda" },
+      "color_mksg46wh": { "label": data.rango_edad || "31 - 45" },
+      "color_mm1274dx": { "label": data.presupuesto || "150K - 200K" },
+      "color_mks9ct6h": { "label": data.origen_contacto || "Formulario web" },
       
-      // ✅ CHECKBOX ✓
-      "boolean_mkvw55qp": { 
-        "checked": true 
-      },
-      
-      // ✅ DATE ✓
+      // ✅ CHECKBOX Y DATE
+      "boolean_mkvw55qp": { "checked": true },
       "date_mksbjga2": new Date().toISOString().split('T')[0],
       
       // ✅ NOMBRE
       "name": data.nombre || "Nuevo Lead"
     });
 
+    // 🚀 1. CREAR ITEM
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 
@@ -92,19 +80,49 @@ export default async function handler(req, res) {
     });
 
     const createData = await createRes.json();
-    
-    if (!createData.data?.create_item?.id) {
+    const itemId = createData.data?.create_item?.id;
+
+    if (!itemId) {
       return res.status(500).json({ 
-        error: 'Monday API Error', 
+        error: 'Error creando item', 
         details: createData.errors 
+      });
+    }
+
+    // 📝 2. AGREGAR RESUMEN LLAMADA como actualización
+    if (data.resumen_llamada) {
+      await fetch(MONDAY_API_URL, {
+        method: 'POST',
+        headers: { 
+          'Authorization': MONDAY_API_KEY, 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({
+          query: `
+            mutation ($itemId: ID!, $text: String!) {
+              create_update(
+                item_id: $itemId, 
+                text: $text
+              ) {
+                id
+              }
+            }
+          `,
+          variables: { 
+            itemId,
+            text: `📞 **RESUMEN LLAMADA** (${new Date().toLocaleString('es-ES')}):\n\n${data.resumen_llamada}`
+          }
+        })
       });
     }
 
     return res.json({ 
       success: true,
-      itemId: createData.data.create_item.id,
-      lead: data.nombre,
-      estado: data.estado_lead
+      itemId,
+      nombre: data.nombre,
+      estado: data.estado_lead,
+      campos_mapeados: 15,
+      resumen_agregado: !!data.resumen_llamada
     });
 
   } catch (error) {
