@@ -67,10 +67,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. RESUMEN LLAMADA → create_timeline_item (ESQUEMA EXACTO)
+    // 2. RESUMEN LLAMADA → create_timeline_item (custom_activity_id FIJO)
     if (data.resumen_llamada) {
       const now = new Date().toISOString();
-      const customActivityId = "llamada-ia-" + Date.now();
 
       await fetch(MONDAY_API_URL, {
         method: 'POST',
@@ -94,7 +93,7 @@ export default async function handler(req, res) {
           `,
           variables: {
             itemId: itemId,
-            custom_activity_id: customActivityId,
+            custom_activity_id: "587c0c1e-a5b2-44cd-a268-48210c319855",  // ✅ ID FIJO
             title: "Resumen llamada IA",
             content: data.resumen_llamada,
             timestamp: now
