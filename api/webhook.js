@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       "name": data.nombre || "Nuevo Lead"
     });
 
-    // 1️⃣ Crear el item en Monday (pido id + name)
+    // 1️⃣ Crear el item en Monday
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 
@@ -66,18 +66,14 @@ export default async function handler(req, res) {
     });
 
     const createData = await createRes.json();
-
-    // 🧾 Log completo para diagnóstico
     console.log("🧩 Respuesta Monday create_item:", JSON.stringify(createData, null, 2));
 
-    // Extraer ID del item y castear a Int
-    const rawItemId = createData?.data?.create_item?.id;
-    if (!rawItemId) {
+    // Extraer ID del item — se mantiene como String para tipo ID! en GraphQL
+    const itemId = createData?.data?.create_item?.id;
+    if (!itemId) {
       console.error("❌ No se obtuvo itemId del create_item", createData.errors);
       return res.status(500).json({ error: 'Item no creado', details: createData.errors });
     }
-
-    const itemId = parseInt(rawItemId, 10);
     console.log("✅ Item creado con ID:", itemId);
 
     // 2️⃣ Crear timeline si hay resumen
@@ -107,7 +103,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           query: `
-            mutation ($itemId: Int!, $custom_activity_id: String!, $title: String!, $content: String!, $timestamp: String!) {
+            mutation ($itemId: ID!, $custom_activity_id: String!, $title: String!, $content: String!, $timestamp: ISO8601DateTime!) {
               create_timeline_item(
                 item_id: $itemId,
                 custom_activity_id: $custom_activity_id,
@@ -130,7 +126,7 @@ export default async function handler(req, res) {
       });
 
       const timelineData = await timelineRes.json();
-      console.log("📬 Respuesta Monday create_timeline_item:", timelineData);
+      console.log("📬 Respuesta Monday create_timeline_item:", JSON.stringify(timelineData, null, 2));
 
       if (timelineData.errors) {
         console.error('⚠️ Error creando timeline:', timelineData.errors);
