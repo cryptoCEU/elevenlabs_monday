@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // 1. CREAR ITEM (igual)
+    // 1. CREAR ITEM
     const columnValues = JSON.stringify({
       "lead_email": { "email": data.email || "", "text": data.email || "" },
       "lead_phone": { "phone": data.telefono || "", "text": data.telefono || "" },
@@ -61,18 +61,15 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Error creando item', details: createData.errors });
     }
 
-    // 2. RESUMEN LLAMADA → create_timeline_item_ea
+    // 2. TIMELINE ITEM EA - Resumen llamada en "Emails y actividades"
     if (data.resumen_llamada) {
       const now = new Date();
-      const start = new Date(now.getTime() - 30 * 60 * 1000).toISOString(); // -30min
-      const end = now.toISOString(); // Ahora
+      const startTime = new Date(now.getTime() - 30 * 60 * 1000).toISOString(); // Hace 30min
+      const endTime = now.toISOString(); // Ahora
 
-      await fetch(MONDAY_API_URL, {
+      const timelineRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
-        headers: { 
-          'Authorization': MONDAY_API_KEY, 
-          'Content-Type': 'application/json' 
-        },
+        headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: `
             mutation ($boardId: ID!, $itemId: ID!, $timeline_item_ea: TimelineItemEaCreateInput!) {
@@ -85,14 +82,14 @@ export default async function handler(req, res) {
               }
             }
           `,
-          variables: { 
+          variables: {
             boardId: BOARD_ID,
-            itemId,
+            itemId: itemId,
             timeline_item_ea: {
-              start_datetime: start,
-              end_datetime: end,
-              content: `📞 **RESUMEN LLAMADA**:\n${data.resumen_llamada}`,
-              type_id: 1099173150  // ID genérico "Llamada" - CAMBIA por el tuyo
+              start_datetime: startTime,
+              end_datetime: endTime,
+              content: `📞 **RESUMEN LLAMADA** (${now.toLocaleString('es-ES')}):\n\n${data.resumen_llamada}`,
+              type_id: 1099173150  // CAMBIA por tu type_id real de "Llamada"
             }
           }
         })
@@ -104,7 +101,7 @@ export default async function handler(req, res) {
       itemId,
       nombre: data.nombre,
       estado: data.estado_lead,
-      timeline: data.resumen_llamada ? '✅ Creado' : '❌ Vacío'
+      timeline: data.resumen_llamada ? '✅ Timeline EA' : '❌ Sin resumen'
     });
 
   } catch (error) {
