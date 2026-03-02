@@ -26,19 +26,16 @@ export default async function handler(req, res) {
       "color_mks9ct6h": { "label": data.origen_contacto || "Google Ads" },
       "boolean_mkvw55qp": { "checked": true },
       "date_mksbjga2": new Date().toISOString().split('T')[0],
-
-      // ✅ Fecha y hora de visita (nueva columna)
       "date_mks930kf": data.datetime_visita_agendada
         ? { 
             "date": data.datetime_visita_agendada.split('T')[0], 
             "time": data.datetime_visita_agendada.split('T')[1] 
           }
         : null,
-
       "name": data.nombre || "Nuevo Lead"
     });
 
-    // 1️⃣ Crear el item en Monday
+    // 1️⃣ Crear el item en Monday (pido id + name)
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: { 
@@ -55,6 +52,7 @@ export default async function handler(req, res) {
               column_values: $columnValues
             ) {
               id
+              name
             }
           }
         `,
@@ -68,18 +66,21 @@ export default async function handler(req, res) {
     });
 
     const createData = await createRes.json();
+
+    // 🧾 Log completo para diagnóstico
+    console.log("🧩 Respuesta Monday create_item:", JSON.stringify(createData, null, 2));
+
+    // Extraer ID del item
     const itemId = createData?.data?.create_item?.id;
-
     if (!itemId) {
-      console.error("❌ Error creando item en Monday:", createData);
-      return res.status(500).json({ error: 'Error creando item', details: createData.errors });
+      console.error("❌ No se obtuvo itemId del create_item", createData.errors);
+      return res.status(500).json({ error: 'Item no creado', details: createData.errors });
     }
+    console.log("✅ Item creado con ID:", itemId);
 
-    // 2️⃣ Crear timeline (actividad personalizada)
+    // 2️⃣ Crear timeline si hay resumen
     if (data.resumen_llamada) {
-      const now = new Date().toISOString(); // Timestamp actual UTC
-
-      // ✅ Título en horario local de España (solo si hay visita)
+      const now = new Date().toISOString();
       const titleBase = "Resumen llamada IA";
       const title = data.datetime_visita_agendada
         ? (() => {
@@ -93,7 +94,8 @@ export default async function handler(req, res) {
         : titleBase;
 
       console.log("🕓 Creando timeline con timestamp:", now);
-      console.log("🗒️ Contenido resumen:", data.resumen_llamada);
+      console.log("🗒️ Título:", title);
+      console.log("📄 Contenido:", data.resumen_llamada);
 
       const timelineRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
@@ -126,10 +128,14 @@ export default async function handler(req, res) {
       });
 
       const timelineData = await timelineRes.json();
-      if (timelineData.errors) console.error('⚠️ Error creando timeline:', timelineData.errors);
+      console.log("📬 Respuesta Monday create_timeline_item:", timelineData);
+
+      if (timelineData.errors) {
+        console.error('⚠️ Error creando timeline:', timelineData.errors);
+      }
     }
 
-    // 3️⃣ Respuesta final del webhook
+    // 3️⃣ Respuesta del webhook
     return res.json({ 
       success: true,
       itemId,
