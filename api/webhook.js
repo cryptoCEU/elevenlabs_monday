@@ -1,5 +1,7 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Solo POST' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Solo POST permitido' });
+  }
 
   const MONDAY_API_URL = "https://api.monday.com/v2";
   const MONDAY_API_KEY = process.env.MONDAY_API_KEY;
@@ -7,89 +9,103 @@ export default async function handler(req, res) {
 
   try {
     const data = req.body;
-    
-    // 🔍 Búsqueda (limit 500)
-    const searchRes = await fetch(MONDAY_API_URL, {
+
+    const columnValues = JSON.stringify({
+      // 📧 EMAIL ✓
+      "lead_email": {
+        "email": data.email || "",
+        "text": data.email || ""
+      },
+      
+      // 📱 PHONE ✓
+      "lead_phone": {
+        "phone": data.telefono || "",
+        "text": data.telefono || ""
+      },
+      
+      // 📝 TEXT ✓
+      "text_mm12yqx0": data.codigo_postal || "",
+      
+      // ✅ STATUS ✓
+      "lead_status": { 
+        "label": data.estado_lead || "Interesado-seguimiento" 
+      },
+      
+      // ✅ DROPDOWNS ✓
+      "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",
+      "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",
+      "dropdown_mm12gwz0": data.anejos || "Sin definir",
+      "dropdown_mksdhhgc": data.motivo_no_interes || "No sabe/no contesta",
+      
+      // ✅ STATUS COLORS ✓
+      "color_mm0ee37e": { 
+        "label": data.destino_vivienda || "Primera vivienda" 
+      },
+      "color_mksg46wh": { 
+        "label": data.rango_edad || "31 - 45" 
+      },
+      "color_mm1274dx": { 
+        "label": data.presupuesto || "300K - 350K" 
+      },
+      "color_mks9ct6h": { 
+        "label": data.origen_contacto || "Google Ads" 
+      },
+      
+      // ✅ CHECKBOX ✓
+      "boolean_mkvw55qp": { 
+        "checked": true 
+      },
+      
+      // ✅ DATE ✓
+      "date_mksbjga2": new Date().toISOString().split('T')[0],
+      
+      // ✅ NOMBRE
+      "name": data.nombre || "Nuevo Lead"
+    });
+
+    const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
-      headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
+      headers: { 
+        'Authorization': MONDAY_API_KEY, 
+        'Content-Type': 'application/json' 
+      },
       body: JSON.stringify({
         query: `
-          query ($boardId: ID!) {
-            boards(ids: [$boardId]) {
-              items_page(limit: 500) {
-                items {
-                  id
-                  column_values(ids: ["lead_email", "lead_phone"]) {
-                    id
-                    value
-                  }
-                }
-              }
+          mutation ($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
+            create_item(
+              board_id: $boardId, 
+              group_id: $groupId,
+              item_name: $itemName, 
+              column_values: $columnValues
+            ) { 
+              id 
             }
           }
         `,
-        variables: { boardId: BOARD_ID }
+        variables: { 
+          boardId: BOARD_ID, 
+          groupId: "topics",
+          itemName: `${data.nombre || 'Lead'} - ${data.estado_lead || 'Nuevo'}`,
+          columnValues 
+        }
       })
     });
 
-    const searchData = await searchRes.json();
-    const items = searchData.data.boards[0].items_page.items;
+    const createData = await createRes.json();
     
-    // 🎯 Buscar match
-    let existingItem = null;
-    for (const item of items) {
-      const emailCol = item.column_values.find(col => col.id === 'lead_email');
-      const phoneCol = item.column_values.find(col => col.id === 'lead_phone');
-      
-      const itemEmail = emailCol?.value ? JSON.parse(emailCol.value)?.email : '';
-      const itemPhone = phoneCol?.value ? JSON.parse(phoneCol.value)?.phone : '';
-      
-      if (itemEmail === data.email || itemPhone === data.telefono) {
-        existingItem = item;
-        break;
-      }
-    }
-
-    if (existingItem) {
-      // 🔥 UPDATE INDIVIDUAL (FUNCIONA SIEMPRE)
-      const updates = [
-        { columnId: "lead_email", value: JSON.stringify({ "email": data.email, "text": data.email }) },
-        { columnId: "lead_phone", value: JSON.stringify({ "phone": data.telefono, "text": data.telefono }) },
-        { columnId: "text_mm12yqx0", value: JSON.stringify(data.codigo_postal || "") },
-        { columnId: "lead_status", value: JSON.stringify({ "label": data.estado_lead || "Interesado-seguimiento" }) },
-        { columnId: "dropdown_mksd92xa", value: JSON.stringify(data.tipologia_interes || "Sin definir") },
-        { columnId: "dropdown_mm12gwz0", value: JSON.stringify(data.anejos || "Sin definir") },
-        { columnId: "color_mm1274dx", value: JSON.stringify({ "label": data.presupuesto || "300K - 350K" }) }
-      ];
-
-      const updatePromises = updates.map(({ columnId, value }) =>
-        fetch(MONDAY_API_URL, {
-          method: 'POST',
-          headers: { 'Authorization': MONDAY_API_KEY, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query: `
-              mutation ($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
-                change_column_value(board_id: $boardId, item_id: $itemId, column_id: $columnId, value: $value) { id }
-              }
-            `,
-            variables: { boardId: BOARD_ID, itemId: existingItem.id, columnId, value }
-          })
-        })
-      );
-
-      await Promise.all(updatePromises);
-      
-      return res.json({ 
-        success: true, 
-        action: "UPDATED", 
-        itemId: existingItem.id,
-        updated: updates.length 
+    if (!createData.data?.create_item?.id) {
+      return res.status(500).json({ 
+        error: 'Monday API Error', 
+        details: createData.errors 
       });
-
-    } else {
-      // CREATE (tu código anterior que funciona)
-      // ... código create_item igual
     }
+
+    return res.json({ 
+      success: true,
+      itemId: createData.data.create_item.id,
+      lead: data.nombre,
+      estado: data.estado_lead
+    });
 
   } catch (error) {
     return res.status(500).json({ error: error.message });
