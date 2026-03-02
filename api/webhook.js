@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // 1. Crear item en Monday
+    // 1. CREAR ITEM en Monday
     const columnValues = JSON.stringify({
       "lead_email": { "email": data.email || "", "text": data.email || "" },
       "lead_phone": { "phone": data.telefono || "", "text": data.telefono || "" },
@@ -67,10 +67,10 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. Resumen llamada → create_timeline_item
+    // 2. RESUMEN LLAMADA → create_timeline_item (ESQUEMA EXACTO)
     if (data.resumen_llamada) {
       const now = new Date().toISOString();
-      const customActivityId = "llamada-" + Date.now();
+      const customActivityId = "llamada-ia-" + Date.now();
 
       await fetch(MONDAY_API_URL, {
         method: 'POST',
@@ -108,7 +108,7 @@ export default async function handler(req, res) {
       itemId: itemId,
       nombre: data.nombre,
       estado: data.estado_lead,
-      timeline: data.resumen_llamada ? '✅ Creado' : '❌ Sin resumen'
+      timeline: data.resumen_llamada ? '✅ Creado en actividades' : '❌ Sin resumen'
     });
 
   } catch (error) {
