@@ -10,42 +10,50 @@ export default async function handler(req, res) {
   try {
     const data = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
+    const now = new Date();
+    const fechaEntrada = {
+      "date": now.toISOString().split('T')[0],
+      "time": now.toTimeString().split(' ')[0] // HH:MM:SS
+    };
+
     // 🧩 Definición de columnas del item
     const columnValues = JSON.stringify({
       // 📧 Contacto
-      "lead_email":       { "email": data.email || "", "text": data.email || "" },
-      "lead_phone":       { "phone": data.telefono || "", "text": data.telefono || "" },
-      "text_mm12yqx0":    data.codigo_postal || "",
+      "lead_email":        { "email": data.email || "", "text": data.email || "" },
+      "lead_phone":        { "phone": data.telefono || "", "text": data.telefono || "" },
+      "text_mm12yqx0":     data.codigo_postal || "",
 
       // 📊 Estado y origen
-      "lead_status":      { "label": data.estado_lead || "Interesado-seguimiento" },
-      "color_mks9ct6h":   { "label": data.origen_contacto || "Google Ads" },
+      "lead_status":       { "label": data.estado_lead || "Interesado-seguimiento" },
+      "color_mks9ct6h":    { "label": data.origen_contacto || "Google Ads" },
 
       // 🤖 Tipo de gestión — siempre "IA" cuando viene de ElevenLabs
-      "color_mks7cm2f":   { "label": "IA" },
+      "color_mks7cm2f":    { "label": "IA" },
 
       // 🏠 Preferencias vivienda
       "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",
       "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",
       "dropdown_mm12gwz0": data.anejos || "Sin definir",
-      "color_mm0ee37e":   { "label": data.destino_vivienda || "Primera vivienda" },
+      "color_mm0ee37e":    { "label": data.destino_vivienda || "Primera vivienda" },
 
       // 🚫 Motivo no interés
       "dropdown_mksdhhgc": data.motivo_no_interes || "No sabe/no contesta",
 
       // 👤 Perfil lead
-      "color_mksg46wh":   { "label": data.rango_edad || "31 - 45" },
-      "color_mm1274dx":   { "label": data.presupuesto || "300K - 350K" },
+      "color_mksg46wh":    { "label": data.rango_edad || "31 - 45" },
+      "color_mm1274dx":    { "label": data.presupuesto || "300K - 350K" },
 
-      // 🌍 Idioma — dropdown_mm131mxd (Idioma preferido)
+      // 🌍 Idioma — dropdown_mm131mxd
       // Valores válidos: "Español", "Inglés", "Catalán", "Francés", "Sueco", "Ruso", "Polaco", "Alemán", "Chino"
       "dropdown_mm131mxd": data.Idioma || "Español",
 
       // ✅ Política de privacidad
-      "boolean_mkvw55qp": { "checked": true },
+      "boolean_mkvw55qp":  { "checked": true },
 
-      // 📅 Fechas
-      "date_mksbjga2": new Date().toISOString().split('T')[0],
+      // 📅 Fecha de entrada — con hora
+      "date_mksbjga2": fechaEntrada,
+
+      // 📅 Fecha y hora visita
       "date_mks930kf": data.datetime_visita_agendada
         ? {
             "date": data.datetime_visita_agendada.split('T')[0],
@@ -99,20 +107,10 @@ export default async function handler(req, res) {
 
     // 2️⃣ Crear timeline si hay resumen
     if (data.resumen_llamada) {
-      const now = new Date().toISOString();
-      const titleBase = "Resumen llamada IA";
-      const title = data.datetime_visita_agendada
-        ? (() => {
-            const fechaVisita = new Date(data.datetime_visita_agendada);
-            const formateada = fechaVisita.toLocaleString('es-ES', {
-              day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-              timeZone: 'Europe/Madrid'
-            });
-            return `${titleBase} — visita ${formateada}`;
-          })()
-        : titleBase;
+      const timestamp = now.toISOString();
+      const title = "Resumen llamada IA";
 
-      console.log("🕓 Creando timeline con timestamp:", now);
+      console.log("🕓 Creando timeline con timestamp:", timestamp);
       console.log("🗒️ Título:", title);
       console.log("📄 Contenido:", data.resumen_llamada);
 
@@ -141,7 +139,7 @@ export default async function handler(req, res) {
             custom_activity_id: "587c0c1e-a5b2-44cd-a268-48210c319855",
             title,
             content: data.resumen_llamada,
-            timestamp: now
+            timestamp
           }
         })
       });
