@@ -64,10 +64,23 @@ export default async function handler(req, res) {
     };
 
     // 📅 Fecha y hora visita — solo si existe
+    // ElevenLabs manda hora local España (Europe/Madrid).
+    // Vercel corre en UTC, así que convertimos a UTC antes de enviar a Monday.
     if (data.datetime_visita_agendada) {
+      const raw = data.datetime_visita_agendada.replace(/Z|[+-]\d{2}:\d{2}$/, '');
+
+      // Calcular offset real de España en esa fecha (CET=+1 invierno, CEST=+2 verano)
+      const ref       = new Date(raw + 'Z');
+      const spainLocal = new Date(ref.toLocaleString('en-US', { timeZone: 'Europe/Madrid' }));
+      const spainUTC   = new Date(ref.toLocaleString('en-US', { timeZone: 'UTC' }));
+      const offsetMs   = spainLocal - spainUTC;
+
+      // Restar el offset: hora local España → UTC
+      const utcDate = new Date(ref.getTime() - offsetMs);
+
       columnValuesObj["date_mks930kf"] = {
-        date: data.datetime_visita_agendada.split('T')[0],
-        time: data.datetime_visita_agendada.split('T')[1]?.slice(0, 8) ?? "00:00:00"
+        date: utcDate.toISOString().split('T')[0],
+        time: utcDate.toISOString().split('T')[1].slice(0, 8)
       };
     }
 
