@@ -38,6 +38,9 @@ export default async function handler(req, res) {
     // 🤖 Tipo de gestión — siempre "IA" cuando viene de ElevenLabs
     columnValuesObj["color_mks7cm2f"] = { label: "IA" };
 
+    // 📞 Intento de contacto — siempre "Intento 1" en la primera llamada
+    columnValuesObj["color_mks9aktw"] = { label: "Intento 1" };
+
     // 🏠 Preferencias vivienda
     if (data.tipologia_interes) columnValuesObj["dropdown_mksd92xa"] = data.tipologia_interes;
     if (data.detalle_vivienda)  columnValuesObj["dropdown_mksdgtr8"] = data.detalle_vivienda;
