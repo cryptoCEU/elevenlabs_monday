@@ -12,10 +12,10 @@ export default async function handler(req, res) {
   }
 
   const MONDAY_API_URL   = "https://api.monday.com/v2";
-  const MONDAY_API_TOKEN = process.env.MONDAY_API_TOKEN;
+  const MONDAY_API_TOKEN = process.env.MONDAY_API_KEY;
   const BOARD_ID         = process.env.MONDAY_BOARD_ID;
 
-  if (!MONDAY_API_TOKEN) return res.status(500).json({ error: "MONDAY_API_TOKEN no configurado" });
+  if (!MONDAY_API_TOKEN) return res.status(500).json({ error: "MONDAY_API_KEY no configurado" });
   if (!BOARD_ID)         return res.status(500).json({ error: "MONDAY_BOARD_ID no configurado" });
 
   try {
