@@ -3,74 +3,83 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Solo se permite POST' });
   }
 
-  const MONDAY_API_URL = "https://api.monday.com/v2";
-  const MONDAY_API_KEY = process.env.MONDAY_API_KEY;
-  const BOARD_ID = process.env.MONDAY_BOARD_ID;
+  // ✅ Autenticación por API key
+  const apiKey = process.env.WEBHOOK_API_KEY;
+  if (apiKey) {
+    const provided = req.headers["authorization"]?.replace("Bearer ", "").trim();
+    if (provided !== apiKey)
+      return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const MONDAY_API_URL   = "https://api.monday.com/v2";
+  const MONDAY_API_TOKEN = process.env.MONDAY_API_TOKEN;
+  const BOARD_ID         = process.env.MONDAY_BOARD_ID;
+
+  if (!MONDAY_API_TOKEN) return res.status(500).json({ error: "MONDAY_API_TOKEN no configurado" });
+  if (!BOARD_ID)         return res.status(500).json({ error: "MONDAY_BOARD_ID no configurado" });
 
   try {
     const data = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
     const now = new Date();
-    const fechaEntrada = {
-      "date": now.toISOString().split('T')[0],
-      "time": now.toTimeString().split(' ')[0] // HH:MM:SS
+
+    // 🧩 Construir columnas solo con los campos que vienen rellenos
+    const columnValuesObj = {};
+
+    // 📧 Contacto
+    if (data.email)         columnValuesObj["lead_email"]      = { email: data.email, text: data.email };
+    if (data.telefono)      columnValuesObj["lead_phone"]      = { phone: data.telefono, text: data.telefono };
+    if (data.codigo_postal) columnValuesObj["text_mm12yqx0"]  = data.codigo_postal;
+
+    // 📊 Estado y origen
+    if (data.estado_lead)     columnValuesObj["lead_status"]    = { label: data.estado_lead };
+    if (data.origen_contacto) columnValuesObj["color_mks9ct6h"] = { label: data.origen_contacto };
+
+    // 🤖 Tipo de gestión — siempre "IA" cuando viene de ElevenLabs
+    columnValuesObj["color_mks7cm2f"] = { label: "IA" };
+
+    // 🏠 Preferencias vivienda
+    if (data.tipologia_interes) columnValuesObj["dropdown_mksd92xa"] = data.tipologia_interes;
+    if (data.detalle_vivienda)  columnValuesObj["dropdown_mksdgtr8"] = data.detalle_vivienda;
+    if (data.anejos)            columnValuesObj["dropdown_mm12gwz0"] = data.anejos;
+    if (data.destino_vivienda)  columnValuesObj["color_mm0ee37e"]    = { label: data.destino_vivienda };
+
+    // 🚫 Motivo no interés
+    if (data.motivo_no_interes) columnValuesObj["dropdown_mksdhhgc"] = data.motivo_no_interes;
+
+    // 👤 Perfil lead
+    if (data.rango_edad)  columnValuesObj["color_mksg46wh"] = { label: data.rango_edad };
+    if (data.presupuesto) columnValuesObj["color_mm1274dx"] = { label: data.presupuesto };
+
+    // 🌍 Idioma — tal cual lo manda ElevenLabs
+    if (data.Idioma) columnValuesObj["dropdown_mm131mxd"] = data.Idioma;
+
+    // ✅ Política de privacidad — siempre true
+    columnValuesObj["boolean_mkvw55qp"] = { checked: true };
+
+    // 📅 Fecha de entrada — siempre se registra
+    columnValuesObj["date_mksbjga2"] = {
+      date: now.toISOString().split('T')[0],
+      time: now.toTimeString().split(' ')[0]
     };
 
-    // 🧩 Definición de columnas del item
-    const columnValues = JSON.stringify({
-      // 📧 Contacto
-      "lead_email":        { "email": data.email || "", "text": data.email || "" },
-      "lead_phone":        { "phone": data.telefono || "", "text": data.telefono || "" },
-      "text_mm12yqx0":     data.codigo_postal || "",
+    // 📅 Fecha y hora visita — solo si existe
+    if (data.datetime_visita_agendada) {
+      columnValuesObj["date_mks930kf"] = {
+        date: data.datetime_visita_agendada.split('T')[0],
+        time: data.datetime_visita_agendada.split('T')[1]?.slice(0, 8) ?? "00:00:00"
+      };
+    }
 
-      // 📊 Estado y origen
-      "lead_status":       { "label": data.estado_lead || "Interesado-seguimiento" },
-      "color_mks9ct6h":    { "label": data.origen_contacto || "Google Ads" },
-
-      // 🤖 Tipo de gestión — siempre "IA" cuando viene de ElevenLabs
-      "color_mks7cm2f":    { "label": "IA" },
-
-      // 🏠 Preferencias vivienda
-      "dropdown_mksd92xa": data.tipologia_interes || "Sin definir",
-      "dropdown_mksdgtr8": data.detalle_vivienda || "Sin definir",
-      "dropdown_mm12gwz0": data.anejos || "Sin definir",
-      "color_mm0ee37e":    { "label": data.destino_vivienda || "Primera vivienda" },
-
-      // 🚫 Motivo no interés
-      "dropdown_mksdhhgc": data.motivo_no_interes || "No sabe/no contesta",
-
-      // 👤 Perfil lead
-      "color_mksg46wh":    { "label": data.rango_edad || "31 - 45" },
-      "color_mm1274dx":    { "label": data.presupuesto || "300K - 350K" },
-
-      // 🌍 Idioma — dropdown_mm131mxd
-      // Valores válidos: "Español", "Inglés", "Catalán", "Francés", "Sueco", "Ruso", "Polaco", "Alemán", "Chino"
-      "dropdown_mm131mxd": data.Idioma || "Español",
-
-      // ✅ Política de privacidad
-      "boolean_mkvw55qp":  { "checked": true },
-
-      // 📅 Fecha de entrada — con hora
-      "date_mksbjga2": fechaEntrada,
-
-      // 📅 Fecha y hora visita
-      "date_mks930kf": data.datetime_visita_agendada
-        ? {
-            "date": data.datetime_visita_agendada.split('T')[0],
-            "time": data.datetime_visita_agendada.split('T')[1]
-          }
-        : null,
-
-      // 🏷️ Nombre
-      "name": data.nombre || "Nuevo Lead"
-    });
+    const columnValues = JSON.stringify(columnValuesObj);
 
     // 1️⃣ Crear el item en Monday
     const createRes = await fetch(MONDAY_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': MONDAY_API_KEY,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${MONDAY_API_TOKEN}`,
+        'Content-Type': 'application/json',
+        'API-Version': '2024-01'
       },
       body: JSON.stringify({
         query: `
@@ -107,18 +116,12 @@ export default async function handler(req, res) {
 
     // 2️⃣ Crear timeline si hay resumen
     if (data.resumen_llamada) {
-      const timestamp = now.toISOString();
-      const title = "Resumen llamada IA";
-
-      console.log("🕓 Creando timeline con timestamp:", timestamp);
-      console.log("🗒️ Título:", title);
-      console.log("📄 Contenido:", data.resumen_llamada);
-
       const timelineRes = await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: {
-          'Authorization': MONDAY_API_KEY,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${MONDAY_API_TOKEN}`,
+          'Content-Type': 'application/json',
+          'API-Version': '2024-01'
         },
         body: JSON.stringify({
           query: `
@@ -137,9 +140,9 @@ export default async function handler(req, res) {
           variables: {
             itemId,
             custom_activity_id: "587c0c1e-a5b2-44cd-a268-48210c319855",
-            title,
+            title: "Resumen llamada IA",
             content: data.resumen_llamada,
-            timestamp
+            timestamp: now.toISOString()
           }
         })
       });
@@ -153,12 +156,12 @@ export default async function handler(req, res) {
     }
 
     // 3️⃣ Respuesta del webhook
-    return res.json({
+    return res.status(200).json({
       success: true,
       itemId,
-      nombre: data.nombre,
-      estado: data.estado_lead,
-      idioma: data.Idioma || "Español",
+      nombre: data.nombre || null,
+      estado: data.estado_lead || null,
+      idioma: data.Idioma || null,
       fecha_visita: data.datetime_visita_agendada || null,
       timeline: data.resumen_llamada ? '✅ Creado en actividades' : '❌ Sin resumen'
     });
