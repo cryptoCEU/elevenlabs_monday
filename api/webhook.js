@@ -42,7 +42,15 @@ export default async function handler(req, res) {
     columnValuesObj["color_mks9aktw"] = { label: "Intento 1" };
 
     // 🏠 Preferencias vivienda
-    if (data.tipologia_interes) columnValuesObj["dropdown_mksd92xa"] = data.tipologia_interes;
+    // tipologia_interes puede venir como array JSON o string simple
+    if (data.tipologia_interes) {
+      let labels = data.tipologia_interes;
+      if (typeof labels === 'string') {
+        try { labels = JSON.parse(labels); } catch { labels = [labels]; }
+      }
+      if (!Array.isArray(labels)) labels = [labels];
+      columnValuesObj["dropdown_mksd92xa"] = { labels };
+    }
     if (data.detalle_vivienda)  columnValuesObj["dropdown_mksdgtr8"] = data.detalle_vivienda;
     if (data.anejos)            columnValuesObj["dropdown_mm12gwz0"] = data.anejos;
     if (data.destino_vivienda)  columnValuesObj["color_mm0ee37e"]    = { label: data.destino_vivienda };
