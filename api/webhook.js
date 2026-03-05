@@ -59,11 +59,18 @@ export default async function handler(req, res) {
       if (!Array.isArray(labels)) labels = [labels];
       columnValuesObj["dropdown_mksdgtr8"] = { labels };
     }
-    if (data.anejos)            columnValuesObj["dropdown_mm12gwz0"] = data.anejos;
+
     if (data.destino_vivienda)  columnValuesObj["color_mm0ee37e"]    = { label: data.destino_vivienda };
 
     // 🚫 Motivo no interés
-    if (data.motivo_no_interes) columnValuesObj["dropdown_mksdhhgc"] = data.motivo_no_interes;
+    if (data.motivo_no_interes) {
+      let labels = data.motivo_no_interes;
+      if (typeof labels === 'string') {
+        try { labels = JSON.parse(labels); } catch { labels = [labels]; }
+      }
+      if (!Array.isArray(labels)) labels = [labels];
+      columnValuesObj["dropdown_mksdhhgc"] = { labels };
+    }
 
     // 👤 Perfil lead
     if (data.rango_edad)  columnValuesObj["color_mksg46wh"] = { label: data.rango_edad };
