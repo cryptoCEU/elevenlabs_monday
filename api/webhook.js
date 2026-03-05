@@ -51,7 +51,14 @@ export default async function handler(req, res) {
       if (!Array.isArray(labels)) labels = [labels];
       columnValuesObj["dropdown_mksd92xa"] = { labels };
     }
-    if (data.detalle_vivienda)  columnValuesObj["dropdown_mksdgtr8"] = data.detalle_vivienda;
+    if (data.detalle_vivienda) {
+      let labels = data.detalle_vivienda;
+      if (typeof labels === 'string') {
+        try { labels = JSON.parse(labels); } catch { labels = [labels]; }
+      }
+      if (!Array.isArray(labels)) labels = [labels];
+      columnValuesObj["dropdown_mksdgtr8"] = { labels };
+    }
     if (data.anejos)            columnValuesObj["dropdown_mm12gwz0"] = data.anejos;
     if (data.destino_vivienda)  columnValuesObj["color_mm0ee37e"]    = { label: data.destino_vivienda };
 
