@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     if (data.codigo_postal) columnValuesObj["text_mm12yqx0"]  = data.codigo_postal;
 
     // 📊 Estado y origen
-    if (data.estado_lead)     columnValuesObj["lead_status"]    = { label: data.estado_lead };
+    if (data.estado_lead)     columnValuesObj["color_mm165spb"] = { label: data.estado_lead };
     if (data.origen_contacto) columnValuesObj["color_mks9ct6h"] = { label: data.origen_contacto };
 
     // 🤖 Tipo de gestión — siempre "IA" cuando viene de ElevenLabs
